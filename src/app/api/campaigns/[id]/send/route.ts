@@ -112,8 +112,8 @@ export async function POST(
     transporter = createGmailTransporter(mailCredentials.email, mailCredentials.pass, 465);
   } catch (error) {
     return NextResponse.json(
-      { error: `SMTP Configuration Error: ${error instanceof Error ? error.message : "Please configure your SMTP email and App Password in Settings."}` },
-      { status: 400 }
+      { error: `Gmail SMTP configuration error: ${error instanceof Error ? error.message : "Unknown error"}` },
+      { status: 500 }
     );
   }
 
@@ -191,20 +191,10 @@ export async function POST(
         mailCredentials
       );
 
-      const now = new Date();
       // Mark as sent
       await prisma.campaignEmail.update({
         where: { id: campaignEmail.id },
-        data: { status: "sent", sentAt: now, error: null },
-      });
-
-      // Update recipient last contacted date & increment follow-up count
-      await prisma.recipient.update({
-        where: { id: recipient.id },
-        data: {
-          lastContactedAt: now,
-          followUpCount: { increment: 1 },
-        },
+        data: { status: "sent", sentAt: new Date(), error: null },
       });
 
       sentCount++;

@@ -64,27 +64,30 @@ export function isValidEmail(value: string) {
 async function parseResponseJson(res: Response) {
   try {
     const text = await res.text();
+    if (!text || !text.trim()) {
+      return { error: `Server returned empty response (${res.status})` };
+    }
     try {
       const json = JSON.parse(text);
       if (json && typeof json === "object") return json;
     } catch {
-      // Not JSON
+      // Not JSON format
     }
     if (!res.ok) {
       if (text.includes("SMTP") || text.includes("credentials")) {
-        return { error: "SMTP credentials not configured. Please add your email App Password in Settings." };
+        return { error: "SMTP credentials not configured. Please set your email App Password in Settings." };
       }
-      return { error: `Server error (${res.status}): Please verify your SMTP settings in Settings page.` };
+      return { error: `Server error (${res.status}): Please check your SMTP credentials in Settings.` };
     }
     return { error: text || `Unexpected response (${res.status})` };
   } catch {
-    return { error: `Connection error (${res.status})` };
+    return { error: `Network error (${res.status})` };
   }
 }
 
 export default function ComposePage() {
   const [activeMode, setActiveMode] = useState<"ai" | "template">("ai");
-  
+
   // Profile
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
@@ -92,12 +95,12 @@ export default function ComposePage() {
   const [addressBook, setAddressBook] = useState<Recipient[]>([]);
   const [chips, setChips] = useState<string[]>([]);
   const [draftInput, setDraftInput] = useState("");
-  
+
   // Form fields
   const [fromName, setFromName] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
-  
+
   // AI options
   const [goal, setGoal] = useState("influencer_marketing");
   const [tone, setTone] = useState("confident and concise");
@@ -260,44 +263,8 @@ export default function ComposePage() {
     if (validEmails.length > 0) {
       setChips((prev) => Array.from(new Set([...prev, ...validEmails])));
       setDraftInput("");
-
-      // Auto-save typed emails directly to Recipient DB
-      try {
-        const res = await fetch("/api/recipients", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            recipients: validEmails.map((email) => {
-              const clean = email.toLowerCase();
-              return {
-                email: clean,
-                company: customBrandMap[clean] || getCompanyFromEmail(clean),
-                name: inferNameFromEmail(clean),
-              };
-            }),
-          }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data.recipients)) {
-            setAddressBook((prev) => {
-              const map = new Map(prev.map((r) => [r.email.toLowerCase(), r]));
-              for (const r of data.recipients) {
-                map.set(r.email.toLowerCase(), r);
-              }
-              return Array.from(map.values());
-            });
-          }
-        }
-      } catch (e) {
-        console.warn("[Compose] Auto-saving typed recipients error:", e);
-      }
-
       if (validEmails.length > 1) {
-        toast.success(`Added & saved ${validEmails.length} recipients to database!`);
-      } else {
-        toast.success(`Saved ${validEmails[0]} to database!`);
+        toast.success(`Added ${validEmails.length} recipients`);
       }
     } else {
       toast.error("Please enter a valid email address or CSV format (e.g. brand, email)");
@@ -637,11 +604,10 @@ export default function ComposePage() {
               <button
                 type="button"
                 onClick={() => setActiveMode("ai")}
-                className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs sm:text-sm font-bold transition-all ${
-                  activeMode === "ai"
+                className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs sm:text-sm font-bold transition-all ${activeMode === "ai"
                     ? "gradient-accent text-primary-foreground shadow-md"
                     : "text-muted-foreground hover:text-foreground"
-                }`}
+                  }`}
               >
                 <Sparkles className="h-4 w-4" />
                 AI Smart Outreach
@@ -649,11 +615,10 @@ export default function ComposePage() {
               <button
                 type="button"
                 onClick={() => setActiveMode("template")}
-                className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs sm:text-sm font-bold transition-all ${
-                  activeMode === "template"
+                className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs sm:text-sm font-bold transition-all ${activeMode === "template"
                     ? "bg-card text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
-                }`}
+                  }`}
               >
                 <FileText className="h-4 w-4" />
                 Standard Template
@@ -686,11 +651,10 @@ export default function ComposePage() {
                     key={g.id}
                     type="button"
                     onClick={() => setGoal(g.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                      goal === g.id
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${goal === g.id
                         ? "gradient-accent text-primary-foreground shadow-sm scale-[1.02]"
                         : "bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
-                    }`}
+                      }`}
                   >
                     <span>{g.icon}</span>
                     <span>{g.label}</span>
@@ -900,11 +864,10 @@ export default function ComposePage() {
               if (f) handleFileUpload(f);
             }}
             onClick={() => fileInputRef.current?.click()}
-            className={`cursor-pointer rounded-2xl border-2 border-dashed p-4 text-center transition-all ${
-              dragging
+            className={`cursor-pointer rounded-2xl border-2 border-dashed p-4 text-center transition-all ${dragging
                 ? "border-primary bg-primary/10 scale-[1.01]"
                 : "border-border hover:bg-secondary/40"
-            }`}
+              }`}
           >
             <Paperclip className="mx-auto mb-1.5 h-4 w-4 text-muted-foreground" />
             {uploadingFile ? (
@@ -970,11 +933,10 @@ export default function ComposePage() {
                   key={s.id}
                   type="button"
                   onClick={() => setSendSpeed(s.id)}
-                  className={`flex flex-col items-center gap-0.5 rounded-2xl border p-2.5 text-xs transition-all ${
-                    sendSpeed === s.id
+                  className={`flex flex-col items-center gap-0.5 rounded-2xl border p-2.5 text-xs transition-all ${sendSpeed === s.id
                       ? "gradient-accent text-primary-foreground font-bold shadow-md border-transparent"
                       : "border-border bg-card text-muted-foreground hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   <s.icon className="h-3.5 w-3.5" />
                   <span className="font-bold text-xs sm:text-sm">{s.label}</span>
@@ -1064,11 +1026,10 @@ export default function ComposePage() {
                         setSubject(em.subject);
                         setBody(em.body);
                       }}
-                      className={`shrink-0 rounded-xl px-2.5 py-1 text-xs font-bold transition-all ${
-                        activePreviewIdx === idx
+                      className={`shrink-0 rounded-xl px-2.5 py-1 text-xs font-bold transition-all ${activePreviewIdx === idx
                           ? "gradient-accent text-primary-foreground shadow-sm"
                           : "border border-border bg-card text-muted-foreground hover:text-foreground"
-                      }`}
+                        }`}
                     >
                       {em.company || em.email.split("@")[0]}
                     </button>

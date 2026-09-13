@@ -104,9 +104,7 @@ export async function POST(req: NextRequest) {
   );
 
   const upsertedRecipients = results
-    .filter(
-      (r): r is PromiseFulfilledResult<any> => r.status === "fulfilled"
-    )
+    .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
     .map((r) => r.value);
 
   const added = upsertedRecipients.length;
