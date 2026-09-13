@@ -24,10 +24,7 @@ emails.csv
 
 # Environment variables & secrets
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
 !.env.example
 
 # IDE & Editor files
