@@ -751,7 +751,7 @@ export default function FollowUpPage() {
                             <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-bold text-foreground">
                               {log.recipient.followUpCount === 0
                                 ? "Initial Email"
-                                | : `Follow-up #${log.recipient.followUpCount}`}
+                                : `Follow-up #${log.recipient.followUpCount}`}
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-right">
