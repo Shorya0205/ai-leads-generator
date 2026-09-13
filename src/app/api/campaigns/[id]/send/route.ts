@@ -112,8 +112,8 @@ export async function POST(
     transporter = createGmailTransporter(mailCredentials.email, mailCredentials.pass, 465);
   } catch (error) {
     return NextResponse.json(
-      { error: `Gmail SMTP configuration error: ${error instanceof Error ? error.message : "Unknown error"}` },
-      { status: 500 }
+      { error: `SMTP Configuration Error: ${error instanceof Error ? error.message : "Please configure your SMTP email and App Password in Settings."}` },
+      { status: 400 }
     );
   }
 

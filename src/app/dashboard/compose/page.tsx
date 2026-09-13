@@ -65,12 +65,20 @@ async function parseResponseJson(res: Response) {
   try {
     const text = await res.text();
     try {
-      return JSON.parse(text);
+      const json = JSON.parse(text);
+      if (json && typeof json === "object") return json;
     } catch {
-      return { error: text || `Server response error (${res.status})` };
+      // Not JSON
     }
+    if (!res.ok) {
+      if (text.includes("SMTP") || text.includes("credentials")) {
+        return { error: "SMTP credentials not configured. Please add your email App Password in Settings." };
+      }
+      return { error: `Server error (${res.status}): Please verify your SMTP settings in Settings page.` };
+    }
+    return { error: text || `Unexpected response (${res.status})` };
   } catch {
-    return { error: `Response error (${res.status})` };
+    return { error: `Connection error (${res.status})` };
   }
 }
 
