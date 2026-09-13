@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getMailCredentials, createGmailTransporter, getSenderEmail, sendEmail } from "@/lib/mailer";
+import { getMailCredentials, createSmtpTransporter, getSenderEmail, sendEmail } from "@/lib/mailer";
 import { applyMergeTags } from "@/lib/mime";
 import { checkSendLimits } from "@/lib/send-limits";
 import { generateFollowUpEmail } from "@/lib/followup-generator";
@@ -77,7 +77,12 @@ export async function POST(req: Request) {
   let transporter;
   try {
     mailCredentials = await getMailCredentials(user.id);
-    transporter = createGmailTransporter(mailCredentials.email, mailCredentials.pass, 465);
+    transporter = createSmtpTransporter(
+      mailCredentials.email,
+      mailCredentials.pass,
+      mailCredentials.host || "smtp.gmail.com",
+      mailCredentials.port || 465
+    );
   } catch (error) {
     return NextResponse.json(
       { error: `SMTP Configuration Error: ${error instanceof Error ? error.message : "Please configure your SMTP email and App Password in Settings."}` },
