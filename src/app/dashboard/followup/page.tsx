@@ -176,7 +176,13 @@ export default function FollowUpPage() {
         }),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      try {
+        const text = await res.text();
+        data = JSON.parse(text);
+      } catch {
+        data = { error: `Server response error (${res.status})` };
+      }
 
       if (!res.ok) {
         toast.error(data.error || "Failed to send follow-up campaign", { id: toastId });

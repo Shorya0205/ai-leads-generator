@@ -61,6 +61,19 @@ export function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+async function parseResponseJson(res: Response) {
+  try {
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { error: text || `Server response error (${res.status})` };
+    }
+  } catch {
+    return { error: `Response error (${res.status})` };
+  }
+}
+
 export default function ComposePage() {
   const [activeMode, setActiveMode] = useState<"ai" | "template">("ai");
   
@@ -522,12 +535,11 @@ export default function ComposePage() {
         body: JSON.stringify(payload),
       });
 
+      const campData = await parseResponseJson(campRes);
       if (!campRes.ok) {
-        const err = await campRes.json();
-        throw new Error(err.error || "Failed to create campaign");
+        throw new Error(campData.error || "Failed to create campaign");
       }
-
-      const campaign = await campRes.json();
+      const campaign = campData;
 
       setSendProgress((p) => ({
         ...p!,
@@ -541,7 +553,7 @@ export default function ComposePage() {
       });
 
       let sendResponse = sendRes;
-      let result = await sendRes.json();
+      let result = await parseResponseJson(sendRes);
 
       if (sendResponse.status === 429 && result.requiresConfirmation) {
         const proceed = window.confirm(`${result.error}\n\nDo you want to send anyway?`);
@@ -551,7 +563,7 @@ export default function ComposePage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ delaySeconds: delay, skipLimitCheck: true }),
           });
-          const retryResult = await retryRes.json();
+          const retryResult = await parseResponseJson(retryRes);
           if (!retryRes.ok) throw new Error(retryResult.error || "Send failed");
           sendResponse = retryRes;
           result = retryResult;
