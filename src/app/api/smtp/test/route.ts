@@ -4,7 +4,7 @@ import { testSmtpConnection } from "@/lib/mailer";
 
 /**
  * POST /api/smtp/test — test SMTP connection with provided credentials
- * Body: { email: string, password: string }
+ * Body: { email: string, password: string, provider?: string, host?: string, port?: number }
  */
 export async function POST(req: NextRequest) {
   try {
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { email, password } = body;
+    const { email, password, provider = "gmail", host, port } = body;
 
     if (!email || !password) {
       return NextResponse.json(
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = await testSmtpConnection(email, password);
+    const result = await testSmtpConnection(email, password, host, port, provider);
 
     if (result.success) {
       return NextResponse.json({ success: true, message: "Connection successful!" });

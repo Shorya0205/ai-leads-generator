@@ -32,6 +32,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { getCompanyFromEmail, inferNameFromEmail } from "@/lib/company-lookup";
+import { parseCSV } from "@/lib/csv";
 
 interface Recipient {
   id: string;
@@ -72,11 +73,12 @@ export default function ComposePage() {
   const [draftInput, setDraftInput] = useState("");
   
   // Form fields
+  const [fromName, setFromName] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   
   // AI options
-  const [goal, setGoal] = useState("internship");
+  const [goal, setGoal] = useState("influencer_marketing");
   const [tone, setTone] = useState("confident and concise");
   const [customInstructions, setCustomInstructions] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -120,6 +122,9 @@ export default function ComposePage() {
       if (profRes.ok) {
         profData = await profRes.json();
         setProfile(profData);
+        if (profData?.fullName) {
+          setFromName(profData.fullName);
+        }
       }
 
       if (recRes.ok) {
@@ -173,17 +178,73 @@ export default function ComposePage() {
     return `~${mins} min${mins > 1 ? "s" : ""}`;
   };
 
-  // Add email chip
-  const addChip = (value: string) => {
-    const v = value.trim().replace(/,$/, "");
-    if (!v) return;
-    if (!isValidEmail(v)) {
-      toast.error("Please enter a valid email address");
+  // Custom brand names map from CSV input
+  const [customBrandMap, setCustomBrandMap] = useState<Record<string, string>>({});
+
+  // Add email chip or parse pasted CSV text
+  const addChip = async (value: string) => {
+    const raw = value.trim();
+    if (!raw) return;
+
+    // 1. Try parsing as CSV text (e.g. brand, email / name, brand, email / multi-line)
+    const parsed = parseCSV(raw);
+
+    if (parsed.length > 0) {
+      const newEmails = parsed.map((p) => p.email);
+
+      // Store custom brand names from CSV
+      const newBrandMap: Record<string, string> = {};
+      for (const p of parsed) {
+        if (p.company) {
+          newBrandMap[p.email.toLowerCase()] = p.company;
+        }
+      }
+      if (Object.keys(newBrandMap).length > 0) {
+        setCustomBrandMap((prev) => ({ ...prev, ...newBrandMap }));
+      }
+
+      // Auto-save/upsert recipients with brand details to DB
+      try {
+        const res = await fetch("/api/recipients", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ recipients: parsed }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.recipients)) {
+            setAddressBook((prev) => {
+              const map = new Map(prev.map((r) => [r.email.toLowerCase(), r]));
+              for (const r of data.recipients) {
+                map.set(r.email.toLowerCase(), r);
+              }
+              return Array.from(map.values());
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("[Compose] Auto-saving CSV recipients warning:", e);
+      }
+
+      setChips((prev) => Array.from(new Set([...prev, ...newEmails])));
+      setDraftInput("");
+      toast.success(`Imported ${parsed.length} recipient(s) from CSV!`);
       return;
     }
-    if (chips.includes(v)) return;
-    setChips((prev) => [...prev, v]);
-    setDraftInput("");
+
+    // 2. Fallback: single email or space/comma separated list
+    const rawParts = raw.split(/[\s,\n]+/).map((s) => s.trim()).filter(Boolean);
+    const validEmails = rawParts.filter((e) => isValidEmail(e));
+
+    if (validEmails.length > 0) {
+      setChips((prev) => Array.from(new Set([...prev, ...validEmails])));
+      setDraftInput("");
+      if (validEmails.length > 1) {
+        toast.success(`Added ${validEmails.length} recipients`);
+      }
+    } else {
+      toast.error("Please enter a valid email address or CSV format (e.g. brand, email)");
+    }
   };
 
   const removeChip = (val: string) => {
@@ -412,6 +473,7 @@ export default function ComposePage() {
       const payload = {
         subject: campaignTitle,
         body: body || "Email content",
+        fromName: fromName.trim() || undefined,
         recipientIds,
         attachmentPath: file?.path,
         attachmentName: file?.name,
@@ -439,7 +501,7 @@ export default function ComposePage() {
       const sendRes = await fetch(`/api/campaigns/${campaign.id}/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ delaySeconds: delay }),
+        body: JSON.stringify({ delaySeconds: delay, fromName: fromName.trim() || undefined }),
       });
 
       let sendResponse = sendRes;
@@ -543,6 +605,45 @@ export default function ComposePage() {
             </div>
           </div>
 
+          {/* AI Goal Selector Pills */}
+          {activeMode === "ai" && (
+            <div className="space-y-2.5 rounded-2xl bg-secondary/30 border border-border p-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4 text-violet" /> Campaign Target &amp; Goal
+                </Label>
+                <span className="text-[11px] text-muted-foreground font-semibold">
+                  AI tailors subject &amp; body per goal
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: "influencer_marketing", label: "Influencer Marketing", icon: "🌟" },
+                  { id: "sales", label: "B2B Sales", icon: "💼" },
+                  { id: "partnership", label: "Partnerships", icon: "🤝" },
+                  { id: "services", label: "Agency Services", icon: "🚀" },
+                  { id: "internship", label: "Job / Internship", icon: "🎓" },
+                  { id: "networking", label: "Networking", icon: "💬" },
+                  { id: "custom", label: "Custom Goal", icon: "🎯" },
+                ].map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setGoal(g.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      goal === g.id
+                        ? "gradient-accent text-primary-foreground shadow-sm scale-[1.02]"
+                        : "bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    <span>{g.icon}</span>
+                    <span>{g.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* "To" Recipient Field */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -551,7 +652,7 @@ export default function ComposePage() {
                 <button
                   type="button"
                   onClick={selectAllAddressBook}
-                  className="flex items-center gap-1.5 text-xs text-slate-800 hover:underline font-bold"
+                  className="flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 hover:underline font-bold transition-colors"
                 >
                   <Users className="h-3.5 w-3.5" />
                   Select all ({addressBook.length})
@@ -561,7 +662,8 @@ export default function ComposePage() {
 
             <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-input bg-secondary/30 p-2.5 min-h-[52px]">
               {chips.map((c) => {
-                const comp = getCompanyFromEmail(c);
+                const recObj = addressBook.find((r) => r.email.toLowerCase() === c.toLowerCase());
+                const comp = customBrandMap[c.toLowerCase()] || recObj?.company || getCompanyFromEmail(c);
                 return (
                   <span
                     key={c}
@@ -569,7 +671,7 @@ export default function ComposePage() {
                   >
                     <span>{c}</span>
                     {comp && (
-                      <span className="rounded-lg bg-violet/20 text-slate-800 px-1.5 py-0.5 text-[11px] font-bold">
+                      <span className="rounded-lg bg-violet-500/20 text-violet-300 border border-violet-500/30 px-2 py-0.5 text-[11px] font-bold shadow-sm">
                         {comp}
                       </span>
                     )}
@@ -587,6 +689,13 @@ export default function ComposePage() {
               <input
                 value={draftInput}
                 onChange={(e) => setDraftInput(e.target.value)}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (pasted && (pasted.includes(",") || pasted.includes("\n") || pasted.includes("@"))) {
+                    e.preventDefault();
+                    addChip(pasted);
+                  }
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === "," || e.key === " ") {
                     e.preventDefault();
@@ -597,7 +706,7 @@ export default function ComposePage() {
                   }
                 }}
                 onBlur={() => draftInput && addChip(draftInput)}
-                placeholder={chips.length === 0 ? "Paste hr@tcs.com, recruiter@google.com..." : "Add more..."}
+                placeholder={chips.length === 0 ? "Paste CSV text (brand, email) or enter emails..." : "Add more..."}
                 className="min-w-[180px] flex-1 bg-transparent px-2 py-1 text-sm sm:text-base outline-none placeholder:text-muted-foreground"
               />
             </div>
@@ -605,11 +714,29 @@ export default function ComposePage() {
             {detectedCompany && (
               <div className="flex items-center gap-2 pt-0.5">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/50 px-3 py-1 text-xs font-semibold text-foreground">
-                  <Building2 className="h-3.5 w-3.5 text-slate-800" />
-                  Target Company: <strong className="text-slate-800">{detectedCompany.company}</strong>
+                  <Building2 className="h-3.5 w-3.5 text-violet-400" />
+                  Target Company: <strong className="text-violet-300 font-bold">{detectedCompany.company}</strong>
                 </span>
               </div>
             )}
+          </div>
+
+          {/* Sender Display Name Field */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-bold flex items-center gap-1.5">
+                <UserCheck className="h-4 w-4 text-violet-400" /> Sender Display Name (From Name)
+              </Label>
+              <span className="text-xs text-muted-foreground font-medium">
+                Appears in recipient inbox (e.g. &quot;Shorya Gupta&quot; or &quot;Shorya | NOVIX&quot;)
+              </span>
+            </div>
+            <Input
+              value={fromName}
+              onChange={(e) => setFromName(e.target.value)}
+              placeholder="e.g. Shorya Gupta or Shorya from NOVIX"
+              className="bg-secondary/20 h-11 text-sm sm:text-base rounded-2xl font-semibold"
+            />
           </div>
 
           {/* Subject Line Field */}
@@ -617,7 +744,7 @@ export default function ComposePage() {
             <div className="flex items-center justify-between">
               <Label className="text-sm font-bold">Subject Line</Label>
               {generatedEmails.length > 1 && (
-                <span className="text-xs text-slate-800 font-semibold">
+                <span className="text-xs text-violet-300 font-semibold">
                   (Customized for: {generatedEmails[activePreviewIdx]?.company || "Selected recipient"})
                 </span>
               )}
@@ -650,6 +777,31 @@ export default function ComposePage() {
                 </button>
               )}
             </div>
+
+            {/* Dynamic Tag Insert Pills */}
+            <div className="flex flex-wrap items-center gap-2 py-1 px-3 rounded-xl bg-secondary/40 border border-border">
+              <span className="text-xs text-muted-foreground font-bold">CSV Tags:</span>
+              {[
+                { tag: "{brand}", label: "Brand / Company" },
+                { tag: "{name}", label: "Name" },
+                { tag: "{email}", label: "Email" },
+              ].map((t) => (
+                <button
+                  key={t.tag}
+                  type="button"
+                  onClick={() => {
+                    handleBodyChange(body + (body && !body.endsWith(" ") ? " " : "") + t.tag);
+                    toast.success(`Inserted ${t.tag} placeholder`);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 border border-primary/20 text-xs font-mono font-bold text-foreground transition-all active:scale-95"
+                  title={`Click to insert ${t.tag} tag`}
+                >
+                  <span className="text-blue-600 font-bold">{t.tag}</span>
+                  <span className="text-[10px] text-muted-foreground font-sans">({t.label})</span>
+                </button>
+              ))}
+            </div>
+
             {generating ? (
               <div className="space-y-2.5 py-3">
                 {[0, 1, 2, 3, 4, 5].map((i) => (
@@ -661,7 +813,7 @@ export default function ComposePage() {
                 value={body}
                 onChange={(e) => handleBodyChange(e.target.value)}
                 rows={10}
-                placeholder="Write your email message..."
+                placeholder="Write your email message... Tip: Use {brand} to automatically insert each company's brand name!"
                 className="resize-none font-mono text-sm leading-relaxed p-3.5 rounded-2xl"
               />
             )}

@@ -11,11 +11,14 @@ import {
   CheckCircle2,
   Loader2,
   Users,
+  Clipboard,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -54,8 +57,43 @@ export default function RecipientsPage() {
   const [email, setEmail] = useState("");
   const [adding, setAdding] = useState(false);
 
+  // Paste CSV dialog state
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [csvText, setCsvText] = useState("");
+  const [importingText, setImportingText] = useState(false);
+
   // CSV file ref
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePasteImport = async () => {
+    if (!csvText.trim()) {
+      toast.error("Please paste CSV text first");
+      return;
+    }
+
+    setImportingText(true);
+    try {
+      const res = await fetch("/api/recipients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csv: csvText.trim() }),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (res.ok && data) {
+        toast.success(`Imported ${data.added} recipient(s)!`);
+        setCsvText("");
+        setPasteOpen(false);
+        fetchRecipients();
+      } else {
+        toast.error(data?.error || "Failed to import CSV text");
+      }
+    } catch {
+      toast.error("Failed to import CSV text");
+    } finally {
+      setImportingText(false);
+    }
+  };
 
   const fetchRecipients = useCallback(async () => {
     try {
@@ -202,6 +240,18 @@ export default function RecipientsPage() {
         description="Everyone in your outreach address book with auto-detected companies."
       />
 
+      <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs sm:text-sm text-foreground">
+        <div className="flex items-start sm:items-center gap-2.5">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary font-bold text-base">💡</span>
+          <div>
+            <strong className="font-bold block sm:inline">CSV Import &amp; {"{brand}"} Personalization:</strong>{" "}
+            <span className="text-muted-foreground">
+              Upload CSV with columns like <code className="bg-background px-1.5 py-0.5 rounded border font-mono font-bold text-foreground">brand, email</code> or <code className="bg-background px-1.5 py-0.5 rounded border font-mono font-bold text-foreground">name, brand, email</code>. In Compose, use <code className="bg-background px-1.5 py-0.5 rounded border font-mono font-bold text-blue-600">{"{brand}"}</code> in your message to automatically insert each brand&apos;s name!
+            </span>
+          </div>
+        </div>
+      </div>
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         {/* Large Search Input */}
         <div className="relative flex-1">
@@ -237,7 +287,7 @@ export default function RecipientsPage() {
             onClick={() => fileInputRef.current?.click()}
             className="h-12 px-5 text-sm font-bold rounded-2xl border-border"
           >
-            <Upload className="mr-2 h-4 w-4" /> Import CSV
+            <Upload className="mr-2 h-4 w-4" /> Upload CSV
           </Button>
           <input
             ref={fileInputRef}
@@ -250,6 +300,47 @@ export default function RecipientsPage() {
               e.target.value = "";
             }}
           />
+
+          {/* Paste CSV Text Dialog */}
+          <Dialog open={pasteOpen} onOpenChange={setPasteOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-12 px-5 text-sm font-bold rounded-2xl border-border flex items-center gap-2"
+              >
+                <Clipboard className="h-4 w-4" /> Paste CSV
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="glass-strong sm:max-w-lg rounded-3xl p-7">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" /> Paste CSV Text
+                </DialogTitle>
+                <DialogDescription className="text-sm">
+                  Paste your CSV data with columns like <code className="font-mono font-bold text-foreground">brand, email</code> or <code className="font-mono font-bold text-foreground">name, brand, email</code>.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 py-2">
+                <Textarea
+                  value={csvText}
+                  onChange={(e) => setCsvText(e.target.value)}
+                  rows={8}
+                  placeholder={`brand, email\nNike, contact@nike.com\nAdidas, info@adidas.com`}
+                  className="font-mono text-sm leading-relaxed rounded-2xl p-3.5"
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  onClick={handlePasteImport}
+                  disabled={importingText || !csvText.trim()}
+                  className="gradient-accent text-primary-foreground h-12 px-6 font-bold rounded-2xl hover:opacity-90"
+                >
+                  {importingText ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                  Import CSV Text
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Add Recipient Dialog */}
           <Dialog open={open} onOpenChange={setOpen}>
@@ -286,8 +377,8 @@ export default function RecipientsPage() {
                     className="h-12 text-base rounded-2xl"
                   />
                   {detectedCompany && (
-                    <p className="text-sm text-slate-800 font-bold flex items-center gap-2 mt-2">
-                      <Building2 className="h-4 w-4" />
+                    <p className="text-sm text-violet-300 font-bold flex items-center gap-2 mt-2">
+                      <Building2 className="h-4 w-4 text-violet-400" />
                       Detected: {detectedCompany}
                     </p>
                   )}
@@ -366,8 +457,8 @@ export default function RecipientsPage() {
                     </td>
                     <td className="px-6 py-4">
                       {r.company ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 border border-slate-200 px-3 py-1 text-sm text-slate-800 font-bold">
-                          <Building2 className="h-3.5 w-3.5" />
+                        <span className="inline-flex items-center gap-1.5 rounded-xl bg-violet-500/20 border border-violet-500/30 px-3 py-1 text-xs sm:text-sm text-violet-300 font-bold shadow-sm">
+                          <Building2 className="h-3.5 w-3.5 text-violet-400" />
                           {r.company}
                         </span>
                       ) : (

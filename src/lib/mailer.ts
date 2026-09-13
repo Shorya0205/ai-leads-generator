@@ -1,6 +1,6 @@
 /**
- * Nodemailer SMTP transport for sending emails via Gmail App Password.
- * Each user stores their own Gmail address + App Password (encrypted).
+ * Nodemailer SMTP transport for sending emails via Hostinger, Gmail, or Custom SMTP.
+ * Each user stores their email credentials (encrypted at rest).
  */
 
 import nodemailer from "nodemailer";
@@ -21,10 +21,13 @@ try {
 export interface MailCredentials {
   email: string;
   pass: string;
+  provider?: string;
+  host?: string;
+  port?: number;
 }
 
 /**
- * Fetch and decrypt the Gmail SMTP credentials for a given user.
+ * Fetch and decrypt the SMTP credentials for a given user.
  */
 export async function getMailCredentials(userId: string): Promise<MailCredentials> {
   const user = await prisma.user.findUniqueOrThrow({
@@ -32,36 +35,54 @@ export async function getMailCredentials(userId: string): Promise<MailCredential
     select: {
       smtpEmail: true,
       smtpPassword: true,
+      smtpProvider: true,
+      smtpHost: true,
+      smtpPort: true,
     },
   });
 
   if (!user.smtpEmail || !user.smtpPassword) {
     throw new Error(
-      "Gmail SMTP not configured — please go to Settings and add your Gmail address and 16-character App Password"
+      "Email SMTP not configured — please go to Settings and add your Hostinger or Gmail SMTP credentials"
     );
   }
 
   const decryptedPassword = decrypt(user.smtpPassword).trim().replace(/\s+/g, "");
+  const provider = user.smtpProvider || "gmail";
+  let host = user.smtpHost?.trim();
+  let port = user.smtpPort || 465;
+
+  if (!host) {
+    if (provider === "hostinger") {
+      host = "smtp.hostinger.com";
+    } else {
+      host = "smtp.gmail.com";
+    }
+  }
 
   return {
     email: user.smtpEmail.trim().toLowerCase(),
     pass: decryptedPassword,
+    provider,
+    host,
+    port,
   };
 }
 
 /**
- * Create a Nodemailer transporter for Gmail.
+ * Create a Nodemailer transporter for any SMTP server (Hostinger, Gmail, Custom).
  * Supports port 465 (SSL direct) or port 587 (STARTTLS).
  */
-export function createGmailTransporter(
+export function createSmtpTransporter(
   email: string,
   pass: string,
-  port: 465 | 587 = 465
+  host: string = "smtp.gmail.com",
+  port: number = 465
 ): nodemailer.Transporter {
   const isDirectSsl = port === 465;
 
   return nodemailer.createTransport({
-    host: "smtp.gmail.com",
+    host,
     port,
     secure: isDirectSsl, // true for 465, false for 587
     auth: {
@@ -79,11 +100,22 @@ export function createGmailTransporter(
 }
 
 /**
+ * Create a Nodemailer transporter specifically for Gmail (backward compatibility).
+ */
+export function createGmailTransporter(
+  email: string,
+  pass: string,
+  port: 465 | 587 = 465
+): nodemailer.Transporter {
+  return createSmtpTransporter(email, pass, "smtp.gmail.com", port);
+}
+
+/**
  * Get an authenticated Nodemailer transport for a given user.
  */
 export async function getMailTransport(userId: string): Promise<nodemailer.Transporter> {
   const creds = await getMailCredentials(userId);
-  return createGmailTransporter(creds.email, creds.pass, 465);
+  return createSmtpTransporter(creds.email, creds.pass, creds.host || "smtp.gmail.com", creds.port || 465);
 }
 
 /**
@@ -108,7 +140,7 @@ interface SendMailOptions {
 }
 
 /**
- * Send a single email using Nodemailer with automatic port 587 fallback if 465 is blocked.
+ * Send a single email using Nodemailer with automatic port fallback if initial port is blocked.
  */
 export async function sendEmail(
   transporter: nodemailer.Transporter,
@@ -184,15 +216,18 @@ export async function sendEmail(
   try {
     return await transporter.sendMail(mailOptions);
   } catch (err) {
-    // If primary port 465 failed and credentials exist, attempt port 587 STARTTLS fallback
+    // If primary port failed and credentials exist, attempt port fallback (e.g. 587 STARTTLS)
     if (credentials) {
+      const primaryHost = credentials.host || "smtp.gmail.com";
+      const fallbackPort = credentials.port === 465 ? 587 : 465;
       console.warn(
-        `[SMTP] Primary send failed (${err instanceof Error ? err.message : String(err)}). Retrying on Port 587 (STARTTLS)...`
+        `[SMTP] Primary send failed (${err instanceof Error ? err.message : String(err)}). Retrying on ${primaryHost}:${fallbackPort}...`
       );
-      const fallbackTransporter = createGmailTransporter(
+      const fallbackTransporter = createSmtpTransporter(
         credentials.email,
         credentials.pass,
-        587
+        primaryHost,
+        fallbackPort
       );
       return await fallbackTransporter.sendMail(mailOptions);
     }
@@ -201,34 +236,49 @@ export async function sendEmail(
 }
 
 /**
- * Test SMTP connection for a given email and password.
- * Tests port 465 first, and falls back to port 587 if needed.
+ * Test SMTP connection for a given email, password, host, and port.
+ * Tests primary port first, and falls back to secondary port if needed.
  */
 export async function testSmtpConnection(
   email: string,
-  password: string
+  password: string,
+  host?: string,
+  port?: number,
+  provider?: string
 ): Promise<{ success: boolean; error?: string }> {
   const cleanEmail = email.trim().toLowerCase();
   const cleanPassword = password.trim().replace(/\s+/g, "");
 
-  // 1. Try Port 465 (SSL)
+  let targetHost = host?.trim();
+  if (!targetHost) {
+    if (provider === "hostinger") {
+      targetHost = "smtp.hostinger.com";
+    } else {
+      targetHost = "smtp.gmail.com";
+    }
+  }
+
+  const primaryPort = port || 465;
+  const secondaryPort = primaryPort === 465 ? 587 : 465;
+
+  // 1. Try Primary Port (e.g., Port 465 SSL)
   try {
-    const transporter465 = createGmailTransporter(cleanEmail, cleanPassword, 465);
-    await transporter465.verify();
+    const transporterPrimary = createSmtpTransporter(cleanEmail, cleanPassword, targetHost, primaryPort);
+    await transporterPrimary.verify();
     return { success: true };
-  } catch (err465) {
-    console.warn("[SMTP Test] Port 465 verify failed, trying Port 587 (STARTTLS):", err465);
+  } catch (errPrimary) {
+    console.warn(`[SMTP Test] ${targetHost}:${primaryPort} verify failed, trying Port ${secondaryPort}:`, errPrimary);
     
-    // 2. Try Port 587 (STARTTLS)
+    // 2. Try Secondary Port (e.g., Port 587 STARTTLS)
     try {
-      const transporter587 = createGmailTransporter(cleanEmail, cleanPassword, 587);
-      await transporter587.verify();
+      const transporterSecondary = createSmtpTransporter(cleanEmail, cleanPassword, targetHost, secondaryPort);
+      await transporterSecondary.verify();
       return { success: true };
-    } catch (err587) {
+    } catch (errSecondary) {
       const errorMsg =
-        err587 instanceof Error
-          ? err587.message
-          : "Failed to connect to Gmail SMTP. Please check your Gmail address and 16-character App Password.";
+        errSecondary instanceof Error
+          ? errSecondary.message
+          : `Failed to connect to ${targetHost} SMTP. Please check your credentials.`;
       return {
         success: false,
         error: errorMsg,

@@ -116,15 +116,15 @@ export default async function DashboardPage() {
         }
       />
 
-      {/* Gmail SMTP Status Alert */}
+      {/* Email SMTP Status Alert */}
       {!hasSmtpConfig && (
         <div className="flex items-center justify-between gap-4 rounded-3xl border border-amber-500/30 bg-amber-500/10 p-5 text-amber-900 dark:text-amber-200">
           <div className="flex items-center gap-4">
             <AlertTriangle className="h-6 w-6 text-amber-500 shrink-0" />
             <div>
-              <p className="text-base font-bold">Gmail SMTP not configured</p>
+              <p className="text-base font-bold">Email SMTP not configured</p>
               <p className="text-sm opacity-80 mt-0.5">
-                Add your Gmail Address &amp; App Password in Settings to send emails directly.
+                Add your Hostinger or Gmail SMTP credentials in Settings to send emails directly.
               </p>
             </div>
           </div>

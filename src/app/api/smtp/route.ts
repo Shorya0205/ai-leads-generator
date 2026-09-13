@@ -16,6 +16,9 @@ export async function GET() {
     return NextResponse.json({
       smtpEmail: user.smtpEmail || null,
       hasPassword: !!user.smtpPassword,
+      smtpProvider: user.smtpProvider || "gmail",
+      smtpHost: user.smtpHost || null,
+      smtpPort: user.smtpPort || null,
     });
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -23,8 +26,8 @@ export async function GET() {
 }
 
 /**
- * POST /api/smtp — save SMTP credentials (email + app password)
- * Body: { email: string, password: string }
+ * POST /api/smtp — save SMTP credentials (provider, email, app password, host, port)
+ * Body: { email: string, password?: string, provider?: string, host?: string, port?: number }
  */
 export async function POST(req: NextRequest) {
   try {
@@ -34,27 +37,51 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { email, password } = body;
+    const { email, password, provider = "gmail", host, port } = body;
 
-    if (!email || !password) {
+    if (!email) {
       return NextResponse.json(
-        { error: "Email and password are required" },
+        { error: "Email address is required" },
+        { status: 400 }
+      );
+    }
+
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { smtpPassword: true },
+    });
+
+    if (!password && !dbUser?.smtpPassword) {
+      return NextResponse.json(
+        { error: "Password is required for SMTP connection" },
         { status: 400 }
       );
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const cleanPassword = password.trim().replace(/\s+/g, "");
+    const defaultHost = provider === "hostinger" ? "smtp.hostinger.com" : provider === "gmail" ? "smtp.gmail.com" : "";
 
-    // Encrypt the app password before storing
-    const encryptedPassword = encrypt(cleanPassword);
+    const updateData: {
+      smtpEmail: string;
+      smtpProvider: string;
+      smtpHost: string;
+      smtpPort: number;
+      smtpPassword?: string;
+    } = {
+      smtpEmail: cleanEmail,
+      smtpProvider: provider,
+      smtpHost: host && host.trim() !== "" ? host.trim() : defaultHost,
+      smtpPort: port ? Number(port) : 465,
+    };
+
+    if (password && password.trim() !== "") {
+      const cleanPassword = password.trim().replace(/\s+/g, "");
+      updateData.smtpPassword = encrypt(cleanPassword);
+    }
 
     await prisma.user.update({
       where: { id: user.id },
-      data: {
-        smtpEmail: cleanEmail,
-        smtpPassword: encryptedPassword,
-      },
+      data: updateData,
     });
 
     return NextResponse.json({ success: true });

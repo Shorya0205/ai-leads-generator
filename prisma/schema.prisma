@@ -20,6 +20,9 @@ model User {
   // SMTP credentials — smtpPassword is AES-256-GCM encrypted before storage
   smtpEmail    String? @map("smtp_email")
   smtpPassword String? @map("smtp_password")
+  smtpProvider String? @default("gmail") @map("smtp_provider")
+  smtpHost     String? @map("smtp_host")
+  smtpPort     Int?    @map("smtp_port")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -74,6 +77,8 @@ model Campaign {
   id      String @id @default(cuid())
   subject String
   body    String // HTML body with merge tags or fallback
+
+  fromName String? @map("from_name") // Custom Sender Display Name (e.g. Shorya Gupta)
 
   attachmentPath String? @map("attachment_path") // path to resume PDF
   attachmentName String? @map("attachment_name") // original filename

@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   X,
+  Wand2,
 } from "lucide-react";
 import { useState, useEffect, type ReactNode } from "react";
 import { useClerk } from "@clerk/nextjs";
@@ -22,6 +23,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/compose", label: "Compose", icon: PenLine },
+  { href: "/dashboard/predict", label: "Email Predictor", icon: Wand2 },
   { href: "/dashboard/recipients", label: "Recipients", icon: Users },
   { href: "/dashboard/history", label: "Campaigns", icon: Send },
   { href: "/dashboard/settings", label: "Settings", icon: SettingsIcon },

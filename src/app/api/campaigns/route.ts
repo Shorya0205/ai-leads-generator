@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   }
 
   const data = await req.json();
-  const { subject, body, recipientIds, attachmentPath, attachmentName, customEmails } = data;
+  const { subject, body, recipientIds, attachmentPath, attachmentName, customEmails, fromName } = data;
 
   if (!subject || !body || !Array.isArray(recipientIds) || recipientIds.length === 0) {
     return NextResponse.json(
@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
     data: {
       subject,
       body,
+      fromName: fromName ? String(fromName).trim() : null,
       attachmentPath: attachmentPath || null,
       attachmentName: attachmentName || null,
       status: "draft",

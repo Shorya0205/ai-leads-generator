@@ -1,12 +1,43 @@
 import type { Metadata } from "next";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
+import { checkEnvOrWarn } from "@/lib/env";
 import "./globals.css";
 
+// Validate environment variables at server startup
+checkEnvOrWarn();
+
 export const metadata: Metadata = {
-  title: "ReachOut — Smart Outreach Tool",
+  title: {
+    default: "ReachOut — Smart AI-Powered Outreach Tool",
+    template: "%s | ReachOut",
+  },
   description:
     "Send AI-personalized outreach emails with your resume attached, individually to every person in your list. Powered by Gmail SMTP.",
+  keywords: [
+    "cold email",
+    "outreach",
+    "AI email",
+    "internship outreach",
+    "job applications",
+    "Gmail SMTP",
+    "personalized emails",
+  ],
+  authors: [{ name: "ReachOut" }],
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    siteName: "ReachOut",
+    title: "ReachOut — Smart AI-Powered Outreach Tool",
+    description:
+      "Send hyper-personalized cold outreach emails tailored per company domain — straight from your Gmail with your resume attached.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ReachOut — Smart AI-Powered Outreach Tool",
+    description:
+      "Send hyper-personalized cold outreach emails tailored per company domain.",
+  },
   icons: {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },
@@ -15,7 +46,12 @@ export const metadata: Metadata = {
     shortcut: "/icon.svg",
     apple: "/icon.svg",
   },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
+
 
 export default function RootLayout({
   children,

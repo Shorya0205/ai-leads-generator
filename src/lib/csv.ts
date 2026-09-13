@@ -12,9 +12,9 @@ export interface ParsedRecipient {
 /**
  * Parse CSV text into an array of recipients.
  * Accepts:
- *   - CSV with headers: email,name,company
+ *   - CSV with headers: brand, email, name / company, email, name
  *   - Plain list: one email per line
- *   - Mixed: "name,email,company" per line (no header)
+ *   - Mixed: "brand, email" or "name, brand, email" per line
  */
 export function parseCSV(text: string): ParsedRecipient[] {
   const lines = text
@@ -25,26 +25,52 @@ export function parseCSV(text: string): ParsedRecipient[] {
   if (lines.length === 0) return [];
 
   // Check if first line is a header row
-  const firstLine = lines[0].toLowerCase();
-  const hasHeader =
-    firstLine.includes("email") ||
-    firstLine.includes("name") ||
-    firstLine.includes("company");
+  const firstLineParts = parseCSVLine(lines[0]).map((h) => h.trim().toLowerCase());
+  const headerKeywords = [
+    "email",
+    "mail",
+    "to",
+    "brand",
+    "company",
+    "org",
+    "organization",
+    "name",
+    "contact",
+    "person",
+  ];
+
+  const hasHeader = firstLineParts.some((h) =>
+    headerKeywords.some((k) => h.includes(k))
+  );
 
   const dataLines = hasHeader ? lines.slice(1) : lines;
 
   // Detect columns from header
-  let emailIdx = 0;
-  let nameIdx = 1;
-  let companyIdx = 2;
+  let emailIdx = -1;
+  let nameIdx = -1;
+  let companyIdx = -1;
 
   if (hasHeader) {
-    const headers = firstLine.split(",").map((h) => h.trim().toLowerCase());
-    emailIdx = headers.indexOf("email");
-    nameIdx = headers.indexOf("name");
-    companyIdx = headers.indexOf("company");
+    firstLineParts.forEach((h, idx) => {
+      if (emailIdx === -1 && (h.includes("email") || h.includes("mail") || h === "to")) {
+        emailIdx = idx;
+      } else if (
+        companyIdx === -1 &&
+        (h.includes("brand") ||
+          h.includes("company") ||
+          h.includes("org") ||
+          h.includes("organization") ||
+          h.includes("business"))
+      ) {
+        companyIdx = idx;
+      } else if (
+        nameIdx === -1 &&
+        (h.includes("name") || h.includes("contact") || h.includes("person"))
+      ) {
+        nameIdx = idx;
+      }
+    });
 
-    // If no email column found, default to first column
     if (emailIdx === -1) emailIdx = 0;
   }
 
@@ -52,31 +78,45 @@ export function parseCSV(text: string): ParsedRecipient[] {
   const seen = new Set<string>();
 
   for (const line of dataLines) {
-    // Handle CSV with commas
-    const parts = parseCSVLine(line);
+    const parts = parseCSVLine(line).map((p) => p.trim());
+    if (parts.length === 0 || parts.every((p) => !p)) continue;
 
-    if (parts.length === 1) {
-      // Plain email
-      const email = parts[0].trim().toLowerCase();
-      if (isValidEmail(email) && !seen.has(email)) {
-        seen.add(email);
-        recipients.push({ email });
-      }
+    let email = "";
+    let name: string | undefined;
+    let company: string | undefined;
+
+    if (hasHeader) {
+      email = (parts[emailIdx] ?? "").toLowerCase();
+      name = nameIdx >= 0 ? parts[nameIdx] || undefined : undefined;
+      company = companyIdx >= 0 ? parts[companyIdx] || undefined : undefined;
     } else {
-      // CSV row
-      const email = (parts[emailIdx] ?? "").trim().toLowerCase();
-      const name = nameIdx >= 0 ? (parts[nameIdx] ?? "").trim() : undefined;
-      const company =
-        companyIdx >= 0 ? (parts[companyIdx] ?? "").trim() : undefined;
+      // Headerless line: find email column automatically
+      const foundEmailIdx = parts.findIndex((p) => isValidEmail(p.toLowerCase()));
 
-      if (isValidEmail(email) && !seen.has(email)) {
-        seen.add(email);
-        recipients.push({
-          email,
-          name: name || undefined,
-          company: company || undefined,
-        });
+      if (foundEmailIdx !== -1) {
+        email = parts[foundEmailIdx].toLowerCase();
+
+        // Remaining non-email parts
+        const otherParts = parts.filter((_, idx) => idx !== foundEmailIdx && Boolean(_));
+
+        if (otherParts.length === 1) {
+          // If only 1 other column (e.g. Nike, hr@nike.com), assume it's brand/company
+          company = otherParts[0];
+        } else if (otherParts.length >= 2) {
+          // 2+ other columns (e.g. John Doe, Nike, hr@nike.com)
+          name = otherParts[0];
+          company = otherParts[1];
+        }
       }
+    }
+
+    if (isValidEmail(email) && !seen.has(email)) {
+      seen.add(email);
+      recipients.push({
+        email,
+        name: name || undefined,
+        company: company || undefined,
+      });
     }
   }
 

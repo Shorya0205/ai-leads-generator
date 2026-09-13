@@ -82,7 +82,7 @@ export default function CampaignsHistoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "sent" | "failed" | "pending">("all");
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
-  
+
   // Selected email ID for the full mail viewer pane
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -346,11 +346,10 @@ export default function CampaignsHistoryPage() {
                   key={tab.id}
                   type="button"
                   onClick={() => setStatusFilter(tab.id)}
-                  className={`flex-1 rounded-xl py-2 px-3 text-xs font-bold transition-all text-center ${
-                    statusFilter === tab.id
+                  className={`flex-1 rounded-xl py-2 px-3 text-xs font-bold transition-all text-center ${statusFilter === tab.id
                       ? "gradient-accent text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -367,11 +366,10 @@ export default function CampaignsHistoryPage() {
               <button
                 type="button"
                 onClick={() => setSelectedCompany(null)}
-                className={`shrink-0 rounded-xl px-3 py-1 text-xs font-bold transition-all ${
-                  selectedCompany === null
+                className={`shrink-0 rounded-xl px-3 py-1 text-xs font-bold transition-all ${selectedCompany === null
                     ? "bg-foreground text-background"
                     : "border border-border bg-card text-muted-foreground hover:text-foreground"
-                }`}
+                  }`}
               >
                 All Companies
               </button>
@@ -380,11 +378,10 @@ export default function CampaignsHistoryPage() {
                   key={comp}
                   type="button"
                   onClick={() => setSelectedCompany(selectedCompany === comp ? null : comp)}
-                  className={`shrink-0 rounded-xl px-3 py-1 text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    selectedCompany === comp
+                  className={`shrink-0 rounded-xl px-3 py-1 text-xs font-bold transition-all flex items-center gap-1.5 ${selectedCompany === comp
                       ? "gradient-accent text-primary-foreground shadow-sm"
                       : "border border-violet/30 bg-violet/5 text-foreground hover:bg-violet/15"
-                  }`}
+                    }`}
                 >
                   <span>{comp}</span>
                   <span className="text-[10px] opacity-75">
@@ -425,11 +422,10 @@ export default function CampaignsHistoryPage() {
                     key={item.id}
                     type="button"
                     onClick={() => setSelectedEmailId(item.id)}
-                    className={`w-full text-left rounded-2xl p-4 transition-all flex flex-col space-y-2 border ${
-                      isSelected
+                    className={`w-full text-left rounded-2xl p-4 transition-all flex flex-col space-y-2 border ${isSelected
                         ? "border-slate-800 bg-slate-100/70 shadow-sm ring-1 ring-slate-400/30"
                         : "border-border bg-card hover:border-violet/30 hover:bg-secondary/40 shadow-sm"
-                    }`}
+                      }`}
                   >
                     {/* Top row: Name, Company, Status */}
                     <div className="flex items-start justify-between gap-2">
@@ -469,15 +465,15 @@ export default function CampaignsHistoryPage() {
                         <Clock className="h-3 w-3" />
                         {item.sentAt
                           ? new Date(item.sentAt).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              hour: "numeric",
-                              minute: "2-digit",
-                            })
+                            month: "short",
+                            day: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })
                           : new Date(item.createdAt).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })}
+                            month: "short",
+                            day: "numeric",
+                          })}
                       </span>
                       {item.attachmentName && (
                         <span className="flex items-center gap-1 text-[11px] text-slate-800 font-semibold">
@@ -531,12 +527,12 @@ export default function CampaignsHistoryPage() {
                           <Clock className="h-3 w-3" />
                           {activeEmail.sentAt
                             ? new Date(activeEmail.sentAt).toLocaleString("en-US", {
-                                weekday: "short",
-                                month: "short",
-                                day: "numeric",
-                                hour: "numeric",
-                                minute: "2-digit",
-                              })
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })
                             : new Date(activeEmail.createdAt).toLocaleDateString("en-US")}
                         </span>
                       </div>

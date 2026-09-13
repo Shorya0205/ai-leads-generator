@@ -200,6 +200,7 @@ body {
   background: rgba(241, 245, 249, 0.6);
   border: 1px solid var(--border);
 }
+
 .dark .tint-lilac {
   background: rgba(30, 41, 59, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -209,6 +210,7 @@ body {
   background: rgba(236, 253, 245, 0.65);
   border: 1px solid rgba(52, 211, 153, 0.3);
 }
+
 .dark .tint-mint {
   background: rgba(16, 185, 129, 0.1);
   border: 1px solid rgba(16, 185, 129, 0.25);
@@ -218,6 +220,7 @@ body {
   background: rgba(254, 252, 232, 0.65);
   border: 1px solid rgba(245, 158, 11, 0.25);
 }
+
 .dark .tint-butter {
   background: rgba(245, 158, 11, 0.1);
   border: 1px solid rgba(245, 158, 11, 0.25);
@@ -227,6 +230,7 @@ body {
   background: rgba(239, 246, 255, 0.65);
   border: 1px solid rgba(59, 130, 246, 0.25);
 }
+
 .dark .tint-sky {
   background: rgba(56, 189, 248, 0.1);
   border: 1px solid rgba(56, 189, 248, 0.25);
@@ -236,6 +240,7 @@ body {
   background-color: var(--primary);
   color: var(--primary-foreground);
 }
+
 .gradient-accent:hover {
   opacity: 0.92;
 }
@@ -248,6 +253,7 @@ body {
 .gradient-ring {
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
+
 .gradient-ring:hover {
   box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.12);
   border-color: rgba(148, 163, 184, 0.4);
@@ -259,6 +265,7 @@ body {
     opacity: 0;
     transform: translateY(8px);
   }
+
   to {
     opacity: 1;
     transform: none;
@@ -273,26 +280,44 @@ body {
   from {
     background-position: 200% 0;
   }
+
   to {
     background-position: -200% 0;
   }
 }
 
 .shimmer {
-  background-image: linear-gradient(
-    90deg,
-    rgba(226, 232, 240, 0.4) 25%,
-    rgba(203, 213, 225, 0.6) 50%,
-    rgba(226, 232, 240, 0.4) 75%
-  );
+  background-image: linear-gradient(90deg,
+      rgba(226, 232, 240, 0.4) 25%,
+      rgba(203, 213, 225, 0.6) 50%,
+      rgba(226, 232, 240, 0.4) 75%);
   background-size: 200% 100%;
   animation: shimmer-sweep 1.4s linear infinite;
 }
+
 .dark .shimmer {
-  background-image: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.03) 25%,
-    rgba(255, 255, 255, 0.08) 50%,
-    rgba(255, 255, 255, 0.03) 75%
-  );
+  background-image: linear-gradient(90deg,
+      rgba(255, 255, 255, 0.03) 25%,
+      rgba(255, 255, 255, 0.08) 50%,
+      rgba(255, 255, 255, 0.03) 75%);
+}
+
+/* Custom Yellow Highlighter Tag */
+.highlight-yellow {
+  background-color: #facc15;
+  color: #000000;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.375rem;
+  font-weight: 700;
+  display: inline-block;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+/* Chalkboard Grid Class */
+.bg-chalkboard-grid {
+  background-color: #0b1f17;
+  background-image: 
+    linear-gradient(rgba(52, 211, 153, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(52, 211, 153, 0.08) 1px, transparent 1px);
+  background-size: 32px 32px;
 }

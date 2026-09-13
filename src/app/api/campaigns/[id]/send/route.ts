@@ -37,6 +37,7 @@ export async function POST(
   // Parse optional body params
   let delaySeconds = DEFAULT_DELAY_SECONDS;
   let skipLimitCheck = false;
+  let customFromName: string | null = null;
   try {
     const body = await req.json();
     if (body.delaySeconds != null) {
@@ -47,6 +48,9 @@ export async function POST(
     }
     if (body.skipLimitCheck === true) {
       skipLimitCheck = true;
+    }
+    if (body.fromName && typeof body.fromName === "string") {
+      customFromName = body.fromName.trim();
     }
   } catch {
     // No body or invalid JSON — use defaults
@@ -113,9 +117,21 @@ export async function POST(
     );
   }
 
-  // Get sender email & name
+  // Fetch user profile for default sender name fallback
+  const userProfile = await prisma.userProfile.findUnique({
+    where: { userId: user.id },
+  });
+
+  // Get sender email & custom display name
   const senderEmail = mailCredentials.email || (await getSenderEmail(user.id));
-  const senderDisplayName = user.name ? user.name.replace(/["\r\n]/g, "") : "";
+  const rawSenderName =
+    customFromName ||
+    campaign.fromName ||
+    userProfile?.fullName ||
+    user.name ||
+    "";
+
+  const senderDisplayName = rawSenderName.trim().replace(/["\r\n]/g, "");
   const fromAddress = senderDisplayName ? `"${senderDisplayName}" <${senderEmail}>` : senderEmail;
 
   // Update campaign status to sending
@@ -133,31 +149,23 @@ export async function POST(
     const recipient = campaignEmail.recipient;
 
     try {
-      // Determine subject and HTML body
-      let finalSubject = campaignEmail.customSubject;
-      if (!finalSubject) {
-        finalSubject = applyMergeTags(campaign.subject, {
-          email: recipient.email,
-          name: recipient.name,
-          company: recipient.company,
-        });
-      }
+      // Determine subject and HTML body with dynamic merge tags ({brand}, {name}, {email})
+      let finalSubject = campaignEmail.customSubject || campaign.subject;
+      finalSubject = applyMergeTags(finalSubject, {
+        email: recipient.email,
+        name: recipient.name,
+        company: recipient.company,
+      });
 
-      let finalBody = campaignEmail.customBody;
-      if (finalBody) {
-        // If it's plain text without HTML paragraph/break tags, convert newlines to <br>
-        if (!finalBody.includes("<p>") && !finalBody.includes("<br>")) {
-          finalBody = finalBody.replace(/\n/g, "<br>");
-        }
-      } else {
-        finalBody = applyMergeTags(campaign.body, {
-          email: recipient.email,
-          name: recipient.name,
-          company: recipient.company,
-        });
-        if (!finalBody.includes("<p>") && !finalBody.includes("<br>")) {
-          finalBody = finalBody.replace(/\n/g, "<br>");
-        }
+      let finalBody = campaignEmail.customBody || campaign.body;
+      finalBody = applyMergeTags(finalBody, {
+        email: recipient.email,
+        name: recipient.name,
+        company: recipient.company,
+      });
+
+      if (!finalBody.includes("<p>") && !finalBody.includes("<br>")) {
+        finalBody = finalBody.replace(/\n/g, "<br>");
       }
 
       // ── Humanize the email to make it unique ──
