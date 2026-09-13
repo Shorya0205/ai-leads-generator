@@ -105,16 +105,7 @@ export async function POST(req: NextRequest) {
 
   const upsertedRecipients = results
     .filter(
-      (
-        r
-      ): r is PromiseFulfilledResult<{
-        id: string;
-        email: string;
-        name: string | null;
-        company: string | null;
-        userId: string;
-        createdAt: Date;
-      }> => r.status === "fulfilled"
+      (r): r is PromiseFulfilledResult<any> => r.status === "fulfilled"
     )
     .map((r) => r.value);
 
