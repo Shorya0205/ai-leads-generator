@@ -20,6 +20,7 @@ import {
   UserCheck,
   Zap,
 } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader, StatusBadge } from "@/components/dashboard-shell";
 
 interface Candidate {
