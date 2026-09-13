@@ -62,6 +62,9 @@ model Recipient {
   name    String?
   company String?
 
+  lastContactedAt DateTime? @map("last_contacted_at") // Timestamp of last email/followup sent
+  followUpCount   Int       @default(0) @map("follow_up_count") // Total followups sent
+
   userId String @map("user_id")
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 

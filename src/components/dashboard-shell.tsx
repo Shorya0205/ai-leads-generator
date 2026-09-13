@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   Wand2,
+  RotateCw,
 } from "lucide-react";
 import { useState, useEffect, type ReactNode } from "react";
 import { useClerk } from "@clerk/nextjs";
@@ -23,6 +24,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/compose", label: "Compose", icon: PenLine },
+  { href: "/dashboard/followup", label: "Follow-Up & History", icon: RotateCw },
   { href: "/dashboard/predict", label: "Email Predictor", icon: Wand2 },
   { href: "/dashboard/recipients", label: "Recipients", icon: Users },
   { href: "/dashboard/history", label: "Campaigns", icon: Send },
