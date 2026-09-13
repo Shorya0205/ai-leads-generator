@@ -43,11 +43,53 @@ export async function POST(req: NextRequest) {
   }
 
   const data = await req.json();
-  const { subject, body, recipientIds, attachmentPath, attachmentName, customEmails, fromName } = data;
+  const { subject, body, recipientIds: inputRecipientIds, emails: inputEmails, attachmentPath, attachmentName, customEmails, fromName } = data;
 
-  if (!subject || !body || !Array.isArray(recipientIds) || recipientIds.length === 0) {
+  if (!subject || !body) {
     return NextResponse.json(
-      { error: "subject, body, and recipientIds are required" },
+      { error: "subject and body are required" },
+      { status: 400 }
+    );
+  }
+
+  const recipientIds: string[] = Array.isArray(inputRecipientIds) ? [...inputRecipientIds] : [];
+
+  // If raw emails array was provided, upsert them into Recipient DB
+  if (Array.isArray(inputEmails) && inputEmails.length > 0) {
+    for (const raw of inputEmails) {
+      const emailStr = typeof raw === "string" ? raw.trim().toLowerCase() : raw?.email?.trim().toLowerCase();
+      if (emailStr) {
+        const name = typeof raw === "object" ? raw.name : null;
+        const company = typeof raw === "object" ? raw.company : null;
+
+        const rec = await prisma.recipient.upsert({
+          where: {
+            userId_email: {
+              userId: user.id,
+              email: emailStr,
+            },
+          },
+          update: {
+            ...(name ? { name } : {}),
+            ...(company ? { company } : {}),
+          },
+          create: {
+            email: emailStr,
+            name: name || null,
+            company: company || null,
+            userId: user.id,
+          },
+        });
+        if (!recipientIds.includes(rec.id)) {
+          recipientIds.push(rec.id);
+        }
+      }
+    }
+  }
+
+  if (recipientIds.length === 0) {
+    return NextResponse.json(
+      { error: "No valid recipientIds or emails provided" },
       { status: 400 }
     );
   }

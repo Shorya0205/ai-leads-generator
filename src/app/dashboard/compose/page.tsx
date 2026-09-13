@@ -239,8 +239,44 @@ export default function ComposePage() {
     if (validEmails.length > 0) {
       setChips((prev) => Array.from(new Set([...prev, ...validEmails])));
       setDraftInput("");
+
+      // Auto-save typed emails directly to Recipient DB
+      try {
+        const res = await fetch("/api/recipients", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipients: validEmails.map((email) => {
+              const clean = email.toLowerCase();
+              return {
+                email: clean,
+                company: customBrandMap[clean] || getCompanyFromEmail(clean),
+                name: inferNameFromEmail(clean),
+              };
+            }),
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.recipients)) {
+            setAddressBook((prev) => {
+              const map = new Map(prev.map((r) => [r.email.toLowerCase(), r]));
+              for (const r of data.recipients) {
+                map.set(r.email.toLowerCase(), r);
+              }
+              return Array.from(map.values());
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("[Compose] Auto-saving typed recipients error:", e);
+      }
+
       if (validEmails.length > 1) {
-        toast.success(`Added ${validEmails.length} recipients`);
+        toast.success(`Added & saved ${validEmails.length} recipients to database!`);
+      } else {
+        toast.success(`Saved ${validEmails[0]} to database!`);
       }
     } else {
       toast.error("Please enter a valid email address or CSV format (e.g. brand, email)");
