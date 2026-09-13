@@ -20,8 +20,7 @@ import {
   UserCheck,
   Zap,
 } from "lucide-react";
-import { toast } from "sonner";
-import { DashboardShell, PageHeader, StatusBadge } from "@/components/dashboard-shell";
+import { PageHeader, StatusBadge } from "@/components/dashboard-shell";
 
 interface Candidate {
   id: string;
@@ -266,7 +265,7 @@ export default function FollowUpPage() {
   };
 
   return (
-    <DashboardShell>
+    <div className="space-y-6">
       <PageHeader
         title={
           <span className="flex items-center gap-3">
@@ -767,6 +766,6 @@ export default function FollowUpPage() {
           </div>
         </div>
       )}
-    </DashboardShell>
+    </div>
   );
 }
